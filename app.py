@@ -31,6 +31,30 @@ def plot_regression(data, model):
 
     return fig
 
+def monte_carlo_simulation(num_simulations):
+    min_values = data[['TV', 'Radio', 'Newspaper']].min().values
+    max_values = data[['TV', 'Radio', 'Newspaper']].max().values
+    mode_values = data[['TV', 'Radio', 'Newspaper']].mode().iloc[0].values
+
+    best_budgets = [0, 0, 0]
+    max_sales = 0
+
+    for _ in range(num_simulations):
+        tv_budget = triang.rvs((mode_values[0]-min_values[0])/(max_values[0]-min_values[0]),
+                               loc=min_values[0], scale=max_values[0]-min_values[0])
+        radio_budget = triang.rvs((mode_values[1]-min_values[1])/(max_values[1]-min_values[1]),
+                                  loc=min_values[1], scale=max_values[1]-min_values[1])
+        newspaper_budget = triang.rvs((mode_values[2]-min_values[2])/(max_values[2]-min_values[2]),
+                                      loc=min_values[2], scale=max_values[2]-min_values[2])
+
+        predicted_sales = model.predict([[tv_budget, radio_budget, newspaper_budget]])[0]
+        
+        if predicted_sales > max_sales:
+            max_sales = predicted_sales
+            best_budgets = [tv_budget, radio_budget, newspaper_budget]
+
+    return best_budgets, max_sales
+
 # Interfaz Streamlit
 st.title('Simulación de Montecarlo para Inversión Publicitaria')
 
@@ -48,8 +72,5 @@ if st.button('Ejecutar simulación'):
     st.write(f'Mejor presupuesto para Radio: ${best_budgets[1]:.2f}')
     st.write(f'Mejor presupuesto para Periódico: ${best_budgets[2]:.2f}')
     st.write(f'Ventas máximas previstas: {max_sales:.2f}')
-
-st.write('Distribución de los datos:')
-st.write(data)
 
 
