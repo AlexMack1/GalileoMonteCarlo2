@@ -2,56 +2,56 @@ import streamlit as st
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 from scipy.stats import triang
+import numpy as np
 
-# Cargar datos
-@st.cache  # Esta función permite que los datos solo se carguen una vez y no en cada reejecución
+# Carga de datos
+@st.cache
 def load_data():
     return pd.read_csv('data.csv')
 
 data = load_data()
 
-# Modelo de regresión lineal
-def train_linear_regression(data):
-    X = data[['TV', 'Newspaper', 'Radio']]
-    y = data['Sales']
-    model = LinearRegression().fit(X, y)
-    return model
+# Creación del modelo de regresión lineal
+X = data[['TV', 'Radio', 'Newspaper']]
+y = data['Sales']
+model = LinearRegression().fit(X, y)
 
-model = train_linear_regression(data)
+# Función de simulación de Montecarlo
+def monte_carlo_simulation(n=1000):
+    tv_min, tv_max = X['TV'].min(), X['TV'].max()
+    radio_min, radio_max = X['Radio'].min(), X['Radio'].max()
+    newspaper_min, newspaper_max = X['Newspaper'].min(), X['Newspaper'].max()
 
-# Distribución triangular para generación de números aleatorios
-def generate_random(media):
-    c = (media.median() - media.min()) / (media.max() - media.min())
-    return triang.rvs(c=c, loc=media.min(), scale=media.max()-media.min())
+    tv_random = triang.rvs((X['TV'].median() - tv_min) / (tv_max - tv_min), loc=tv_min, scale=tv_max - tv_min, size=n)
+    radio_random = triang.rvs((X['Radio'].median() - radio_min) / (radio_max - radio_min), loc=radio_min, scale=radio_max - radio_min, size=n)
+    newspaper_random = triang.rvs((X['Newspaper'].median() - newspaper_min) / (newspaper_max - newspaper_min), loc=newspaper_min, scale=newspaper_max - newspaper_min, size=n)
+    
+    max_sales = -np.inf
+    best_budgets = None
+    
+    for tv, radio, newspaper in zip(tv_random, radio_random, newspaper_random):
+        sales_pred = model.predict([[tv, radio, newspaper]])[0]
+        if sales_pred > max_sales:
+            max_sales = sales_pred
+            best_budgets = tv, radio, newspaper
+            
+    return best_budgets, max_sales
 
-# Simulación de Montecarlo
-def monte_carlo_simulation(N=10000):
-    results = []
-    for _ in range(N):
-        random_tv = generate_random(data['TV'])
-        random_radio = generate_random(data['Radio'])
-        random_newspaper = generate_random(data['Newspaper'])
-        predicted_sales = model.predict([[random_tv, random_newspaper, random_radio]])[0]
-        results.append((predicted_sales, random_tv, random_newspaper, random_radio))
-    return max(results)
+# Interfaz Streamlit
+st.title('Simulación de Montecarlo para Inversión Publicitaria')
 
-best_sales, best_tv, best_newspaper, best_radio = monte_carlo_simulation()
+# Número de simulaciones
+num_simulations = st.number_input('Número de simulaciones', min_value=100, value=1000)
 
-# Normalización y obtención de porcentajes
-total_budget = best_tv + best_newspaper + best_radio
-percent_tv = best_tv / total_budget
-percent_newspaper = best_newspaper / total_budget
-percent_radio = best_radio / total_budget
+# Botón para ejecutar simulación
+if st.button('Ejecutar simulación'):
+    best_budgets, max_sales = monte_carlo_simulation(num_simulations)
+    st.write(f'Mejor presupuesto para TV: ${best_budgets[0]:.2f}')
+    st.write(f'Mejor presupuesto para Radio: ${best_budgets[1]:.2f}')
+    st.write(f'Mejor presupuesto para Periódico: ${best_budgets[2]:.2f}')
+    st.write(f'Ventas máximas previstas: {max_sales:.2f}')
 
-# Interfaz de Streamlit
-st.title('Simulación de Inversión en Publicidad')
+st.write('Distribución de los datos:')
+st.write(data)
 
-# Entradas (por ejemplo, puedes permitir que los usuarios introduzcan presupuestos)
-budget = st.number_input('Introduce el presupuesto total:', value=1000.0)
-
-st.write(f"Presupuesto óptimo para TV: ${budget * percent_tv:.2f}")
-st.write(f"Presupuesto óptimo para Periódico: ${budget * percent_newspaper:.2f}")
-st.write(f"Presupuesto óptimo para Radio: ${budget * percent_radio:.2f}")
-
-st.write(f"Ventas proyectadas: ${best_sales:.2f}")
 
